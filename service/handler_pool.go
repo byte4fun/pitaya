@@ -86,7 +86,7 @@ func (h *HandlerPool) ProcessHandlerMessage(
 		return nil, err
 	}
 
-	logger.Debugf("SID=%d, Data=%s", session.ID(), data)
+	logger.Debugf("SID=%d, Data=%s", session.ID(), arg)
 	args := []reflect.Value{handler.Receiver, reflect.ValueOf(ctx)}
 	if arg != nil {
 		args = append(args, reflect.ValueOf(arg))
