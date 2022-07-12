@@ -24,11 +24,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/nats-io/nuid"
 	"os"
 	"reflect"
 	"runtime/debug"
 	"strconv"
+
+	"github.com/nats-io/nuid"
 
 	"github.com/topfreegames/pitaya/v2/conn/message"
 	"github.com/topfreegames/pitaya/v2/constants"
@@ -174,10 +175,10 @@ func CtxWithDefaultLogger(ctx context.Context, route, userID string) context.Con
 	requestID := pcontext.GetFromPropagateCtx(ctx, constants.RequestIDKey)
 	if rID, ok := requestID.(string); ok {
 		if rID == "" {
-			requestID = nuid.New()
+			requestID = nuid.New().Next()
 		}
 	} else {
-		requestID = nuid.New()
+		requestID = nuid.New().Next()
 	}
 	defaultLogger := logger.Log.WithFields(
 		map[string]interface{}{
