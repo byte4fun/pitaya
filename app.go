@@ -361,6 +361,8 @@ func (app *App) listen() {
 			a.ListenAndServe()
 		}()
 
+		time.Sleep(time.Millisecond * 100)
+
 		logger.Log.Infof("listening with acceptor %s on addr %s", reflect.TypeOf(a), a.GetAddr())
 	}
 
