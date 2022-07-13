@@ -64,3 +64,7 @@ func (s *Server) AsJSONString() string {
 	}
 	return string(str)
 }
+
+func (s *Server) String() string {
+	return s.AsJSONString()
+}

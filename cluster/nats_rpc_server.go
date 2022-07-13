@@ -24,7 +24,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math"
 	"time"
 
 	"github.com/golang/protobuf/proto"
@@ -197,7 +196,7 @@ func (ns *NatsRPCServer) handleMessages() {
 		close(ns.subChan)
 		close(ns.bindingsChan)
 	})()
-	maxPending := float64(0)
+	maxPending := 0
 	for {
 		select {
 		case msg := <-ns.subChan:
@@ -210,8 +209,10 @@ func (ns *NatsRPCServer) handleMessages() {
 				logger.Log.Warnf("[rpc server] some messages were dropped! numDropped: %d", dropped)
 				ns.dropped = dropped
 			}
-			subsChanLen := float64(len(ns.subChan))
-			maxPending = math.Max(float64(maxPending), subsChanLen)
+			subsChanLen := len(ns.subChan)
+			if maxPending < subsChanLen {
+				maxPending = subsChanLen
+			}
 			logger.Log.Debugf("subs channel size: %d, max: %d, dropped: %d", subsChanLen, maxPending, dropped)
 			req := &protos.Request{}
 			// TODO: Add tracing here to report delay to start processing message in spans
