@@ -70,8 +70,11 @@ func Pcall(method reflect.Method, args []reflect.Value) (rets interface{}, err e
 			stackTrace := debug.Stack()
 			stackTraceAsRawStringLiteral := strconv.Quote(string(stackTrace))
 			log := getLoggerFromArgs(args)
-			log.Errorf("panic - pitaya/dispatch: methodName=%s panicData=%v stackTrace=%s", method.Name, rec, stackTraceAsRawStringLiteral)
-
+			trace := stackTraceAsRawStringLiteral
+			if _, ok := os.LookupEnv("PITAYA_DEBUG"); ok {
+				trace = string(stackTrace)
+			}
+			log.Errorf("panic - pitaya/dispatch: methodName=%s panicData=%v stackTrace=%s", method.Name, rec, trace)
 			if s, ok := rec.(string); ok {
 				err = errors.New(s)
 			} else {
