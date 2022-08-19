@@ -62,6 +62,7 @@ func (r *Route) Short() string {
 
 // Decode decodes the route
 func Decode(route string) (*Route, error) {
+	route = strings.ToLower(route)
 	r := strings.Split(route, ".")
 	for _, s := range r {
 		if strings.TrimSpace(s) == "" {
