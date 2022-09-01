@@ -35,6 +35,7 @@ import (
 	"github.com/topfreegames/pitaya/v2/conn/message"
 	"github.com/topfreegames/pitaya/v2/conn/packet"
 	"github.com/topfreegames/pitaya/v2/constants"
+	pcontext "github.com/topfreegames/pitaya/v2/context"
 	"github.com/topfreegames/pitaya/v2/errors"
 	"github.com/topfreegames/pitaya/v2/logger"
 	"github.com/topfreegames/pitaya/v2/metrics"
@@ -316,12 +317,14 @@ func (a *agentImpl) ResponseMID(ctx context.Context, mid uint, v interface{}, is
 		return constants.ErrSessionOnNotify
 	}
 
+	route := pcontext.GetFromPropagateCtx(ctx, constants.RouteKey)
+
 	switch d := v.(type) {
 	case []byte:
-		logger.Log.Debugf("Type=Response, ID=%d, UID=%s, MID=%d, Data=%dbytes",
-			a.Session.ID(), a.Session.UID(), mid, len(d))
+		logger.Log.Debugf("Type=Response, ID=%d, UID=%s, MID=%d, Route=%s, Data=%dbytes",
+			a.Session.ID(), a.Session.UID(), mid, route, len(d))
 	default:
-		logger.Log.Infof("Type=Response, ID=%d, UID=%s, MID=%d, Data=%+v",
+		logger.Log.Infof("Type=Response, ID=%d, UID=%s, MID=%d, Route=%s, Data=%+v",
 			a.Session.ID(), a.Session.UID(), mid, v)
 	}
 
