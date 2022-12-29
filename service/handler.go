@@ -24,9 +24,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/nats-io/nuid"
+	"math/rand"
 	"strings"
 	"time"
+
+	"github.com/nats-io/nuid"
 
 	"github.com/topfreegames/pitaya/v2/acceptor"
 	"github.com/topfreegames/pitaya/v2/pipeline"
@@ -59,9 +61,9 @@ type (
 	// HandlerService service
 	HandlerService struct {
 		baseService
-		chLocalProcess   chan unhandledMessage // channel of messages that will be processed locally
-		chRemoteProcess  chan unhandledMessage // channel of messages that will be processed remotely
-		decoder          codec.PacketDecoder   // binary decoder
+		chLocalProcess   []chan unhandledMessage // channel of messages that will be processed locally
+		chRemoteProcess  []chan unhandledMessage // channel of messages that will be processed remotely
+		decoder          codec.PacketDecoder     // binary decoder
 		remoteService    *RemoteService
 		serializer       serialize.Serializer          // message serializer
 		server           *cluster.Server               // server obj
@@ -70,6 +72,8 @@ type (
 		agentFactory     agent.AgentFactory
 		handlerPool      *HandlerPool
 		handlers         map[string]*component.Handler // all handler method
+		dispatchCount    int
+		rander           *rand.Rand
 	}
 
 	unhandledMessage struct {
@@ -84,6 +88,7 @@ type (
 func NewHandlerService(
 	packetDecoder codec.PacketDecoder,
 	serializer serialize.Serializer,
+	dispatchCount int,
 	localProcessBufferSize int,
 	remoteProcessBufferSize int,
 	server *cluster.Server,
@@ -94,9 +99,9 @@ func NewHandlerService(
 	handlerPool *HandlerPool,
 ) *HandlerService {
 	h := &HandlerService{
+		rander:           rand.New(rand.NewSource(time.Now().UnixNano())),
+		dispatchCount:    dispatchCount,
 		services:         make(map[string]*component.Service),
-		chLocalProcess:   make(chan unhandledMessage, localProcessBufferSize),
-		chRemoteProcess:  make(chan unhandledMessage, remoteProcessBufferSize),
 		decoder:          packetDecoder,
 		serializer:       serializer,
 		server:           server,
@@ -107,6 +112,10 @@ func NewHandlerService(
 		handlers:         make(map[string]*component.Handler),
 	}
 
+	for i := 0; i < dispatchCount; i++ {
+		h.chLocalProcess = append(h.chLocalProcess, make(chan unhandledMessage, localProcessBufferSize))
+		h.chRemoteProcess = append(h.chRemoteProcess, make(chan unhandledMessage, remoteProcessBufferSize))
+	}
 	h.handlerHooks = handlerHooks
 
 	return h
@@ -120,11 +129,11 @@ func (h *HandlerService) Dispatch(thread int) {
 	for {
 		// Calls to remote servers block calls to local server
 		select {
-		case lm := <-h.chLocalProcess:
+		case lm := <-h.chLocalProcess[thread]:
 			metrics.ReportMessageProcessDelayFromCtx(lm.ctx, h.metricsReporters, "local")
 			h.localProcess(lm.ctx, lm.agent, lm.route, lm.msg)
 
-		case rm := <-h.chRemoteProcess:
+		case rm := <-h.chRemoteProcess[thread]:
 			metrics.ReportMessageProcessDelayFromCtx(rm.ctx, h.metricsReporters, "remote")
 			h.remoteService.remoteProcess(rm.ctx, nil, rm.agent, rm.route, rm.msg)
 
@@ -244,7 +253,6 @@ func (h *HandlerService) processPacket(a agent.Agent, p *packet.Packet) error {
 			return fmt.Errorf("receive data on socket which is not yet ACK, session will be closed immediately, remote=%s",
 				a.RemoteAddr().String())
 		}
-
 		msg, err := message.Decode(p.Data)
 		if err != nil {
 			return err
@@ -291,11 +299,27 @@ func (h *HandlerService) processMessage(a agent.Agent, msg *message.Message) {
 		route: r,
 		msg:   msg,
 	}
+	var sessionId int64
+	if message.agent != nil {
+		if sess := message.agent.GetSession(); sess != nil {
+			sessionId = sess.ID()
+		}
+	}
+	threadId := -1
+	if sessionId > 0 {
+		threadId = int(sessionId % int64(h.dispatchCount))
+		// logger.Log.Debugf("-----> network id:%d threadId:%d",
+		// 	message.agent.GetSession().ID(), threadId)
+	} else {
+		threadId = h.rander.Intn(h.dispatchCount)
+		// logger.Log.Debugf("-----> network rand id:%d threadId:%d",
+		// 	message.agent.GetSession().ID(), threadId)
+	}
 	if r.SvType == h.server.Type {
-		h.chLocalProcess <- message
+		h.chLocalProcess[threadId] <- message
 	} else {
 		if h.remoteService != nil {
-			h.chRemoteProcess <- message
+			h.chRemoteProcess[threadId] <- message
 		} else {
 			logger.Log.Warnf("request made to another server type but no remoteService running")
 		}

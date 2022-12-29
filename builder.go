@@ -260,6 +260,7 @@ func (builder *Builder) Build() Pitaya {
 	handlerService := service.NewHandlerService(
 		builder.PacketDecoder,
 		builder.Serializer,
+		builder.Config.Pitaya.Concurrency.Handler.Dispatch,
 		builder.Config.Pitaya.Buffer.Handler.LocalProcess,
 		builder.Config.Pitaya.Buffer.Handler.RemoteProcess,
 		builder.Server,

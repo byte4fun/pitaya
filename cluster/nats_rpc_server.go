@@ -24,6 +24,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/rand"
 	"time"
 
 	"github.com/golang/protobuf/proto"
@@ -51,7 +52,7 @@ type NatsRPCServer struct {
 	stopChan               chan bool
 	subChan                chan *nats.Msg // subChan is the channel used by the server to receive network messages addressed to itself
 	bindingsChan           chan *nats.Msg // bindingsChan receives notify from other servers on every user bind to session
-	unhandledReqCh         chan *protos.Request
+	unhandledReqCh         []chan *protos.Request
 	responses              []*protos.Response
 	requests               []*protos.Request
 	userPushCh             chan *protos.Push
@@ -62,6 +63,7 @@ type NatsRPCServer struct {
 	metricsReporters       []metrics.Reporter
 	sessionPool            session.SessionPool
 	appDieChan             chan bool
+	rander                 *rand.Rand
 }
 
 // NewNatsRPCServer ctor
@@ -73,9 +75,9 @@ func NewNatsRPCServer(
 	sessionPool session.SessionPool,
 ) (*NatsRPCServer, error) {
 	ns := &NatsRPCServer{
+		rander:            rand.New(rand.NewSource(time.Now().UnixNano())),
 		server:            server,
 		stopChan:          make(chan bool),
-		unhandledReqCh:    make(chan *protos.Request),
 		dropped:           0,
 		metricsReporters:  metricsReporters,
 		appDieChan:        appDieChan,
@@ -106,6 +108,9 @@ func (ns *NatsRPCServer) configure(config config.NatsRPCServerConfig) error {
 		return constants.ErrNatsPushBufferSizeZero
 	}
 	ns.subChan = make(chan *nats.Msg, ns.messagesBufferSize)
+	for i := 0; i < ns.service; i++ {
+		ns.unhandledReqCh = append(ns.unhandledReqCh, make(chan *protos.Request))
+	}
 	ns.bindingsChan = make(chan *nats.Msg, ns.messagesBufferSize)
 	// the reason this channel is buffered is that we can achieve more performance by not
 	// blocking producers on a massive push
@@ -192,7 +197,9 @@ func (ns *NatsRPCServer) subscribeToUserMessages(uid string, svType string) (*na
 func (ns *NatsRPCServer) handleMessages() {
 	defer (func() {
 		ns.conn.Drain()
-		close(ns.unhandledReqCh)
+		for i := 0; i < ns.service; i++ {
+			close(ns.unhandledReqCh[i])
+		}
 		close(ns.subChan)
 		close(ns.bindingsChan)
 	})()
@@ -223,7 +230,21 @@ func (ns *NatsRPCServer) handleMessages() {
 				continue
 			}
 			req.Msg.Reply = msg.Reply
-			ns.unhandledReqCh <- req
+			var sessionId int64
+			if req.Session != nil {
+				sessionId = req.Session.Id
+			}
+			threadId := -1
+			if sessionId > 0 {
+				threadId = int(sessionId % int64(ns.service))
+				// logger.Log.Debugf("-----> rpc route:%s id:%d threadId:%d",
+				// 	req.Msg.Route, sessionId, threadId)
+			} else {
+				threadId = ns.rander.Intn(ns.service)
+				// logger.Log.Debugf("-----> rpc rand route:%s id:%d threadId:%d",
+				// 	req.Msg.Route, sessionId, threadId)
+			}
+			ns.unhandledReqCh[threadId] <- req
 		case <-ns.stopChan:
 			return
 		}
@@ -231,8 +252,8 @@ func (ns *NatsRPCServer) handleMessages() {
 }
 
 // GetUnhandledRequestsChannel gets the unhandled requests channel from nats rpc server
-func (ns *NatsRPCServer) GetUnhandledRequestsChannel() chan *protos.Request {
-	return ns.unhandledReqCh
+func (ns *NatsRPCServer) GetUnhandledRequestsChannel(threadID int) chan *protos.Request {
+	return ns.unhandledReqCh[threadID]
 }
 
 func (ns *NatsRPCServer) getUserPushChannel() chan *protos.Push {
@@ -262,7 +283,7 @@ func (ns *NatsRPCServer) marshalResponse(res *protos.Response) ([]byte, error) {
 }
 
 func (ns *NatsRPCServer) processMessages(threadID int) {
-	for ns.requests[threadID] = range ns.GetUnhandledRequestsChannel() {
+	for ns.requests[threadID] = range ns.GetUnhandledRequestsChannel(threadID) {
 		logger.Log.Debugf("(%d) processing message %v", threadID, ns.requests[threadID].GetMsg().GetId())
 		ctx, err := util.GetContextFromRequest(ns.requests[threadID], ns.server.ID)
 		if err != nil {
