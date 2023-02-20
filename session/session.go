@@ -87,7 +87,7 @@ type sessionImpl struct {
 	data              map[string]interface{}      // session data store
 	handshakeData     *HandshakeData              // handshake data received by the client
 	encodedData       []byte                      // session data encoded as a byte array
-	OnCloseCallbacks  []func()                    //onClose callbacks
+	OnCloseCallbacks  []func()                    // onClose callbacks
 	IsFrontend        bool                        // if session is a frontend session
 	frontendID        string                      // the id of the frontend that owns the session
 	frontendSessionID int64                       // the id of the session on the frontend server
@@ -107,7 +107,7 @@ type Session interface {
 	SetIsFrontend(isFrontend bool)
 	SetSubscriptions(subscriptions []*nats.Subscription)
 
-	Push(route string, v interface{}) error
+	Push(ctx context.Context, route string, v interface{}) error
 	ResponseMID(ctx context.Context, mid uint, v interface{}, err ...bool) error
 	ID() int64
 	UID() string
@@ -310,8 +310,8 @@ func (s *sessionImpl) SetSubscriptions(subscriptions []*nats.Subscription) {
 }
 
 // Push message to client
-func (s *sessionImpl) Push(route string, v interface{}) error {
-	return s.entity.Push(route, v)
+func (s *sessionImpl) Push(ctx context.Context, route string, v interface{}) error {
+	return s.entity.Push(ctx, route, v)
 }
 
 // ResponseMID responses message to client, mid is

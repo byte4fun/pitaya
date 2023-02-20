@@ -31,7 +31,7 @@ import (
 	"github.com/topfreegames/pitaya/v2/conn/message"
 	"github.com/topfreegames/pitaya/v2/conn/packet"
 	"github.com/topfreegames/pitaya/v2/constants"
-	"github.com/topfreegames/pitaya/v2/logger"
+	pcontext "github.com/topfreegames/pitaya/v2/context"
 	"github.com/topfreegames/pitaya/v2/protos"
 	"github.com/topfreegames/pitaya/v2/route"
 	"github.com/topfreegames/pitaya/v2/serialize"
@@ -103,26 +103,26 @@ func (a *Remote) Kick(ctx context.Context) error {
 }
 
 // Push pushes the message to the user
-func (a *Remote) Push(route string, v interface{}) error {
+func (a *Remote) Push(ctx context.Context, route string, v interface{}) error {
 	if (reflect.TypeOf(a.rpcClient) == reflect.TypeOf(&cluster.NatsRPCClient{}) &&
 		a.Session.UID() == "") {
 		return constants.ErrNoUIDBind
 	}
-	switch d := v.(type) {
-	case []byte:
-		logger.Log.Debugf("Type=Push, ID=%d, UID=%s, Route=%s, Data=%dbytes",
-			a.Session.ID(), a.Session.UID(), route, len(d))
-	default:
-		logger.Log.Debugf("Type=Push, ID=%d, UID=%s, Route=%s, Data=%+v",
-			a.Session.ID(), a.Session.UID(), route, v)
-	}
+	// switch d := v.(type) {
+	// case []byte:
+	// 	logger.Log.Debugf("Type=Push, ID=%d, UID=%s, Route=%s, Data=%dbytes",
+	// 		a.Session.ID(), a.Session.UID(), route, len(d))
+	// default:
+	// 	logger.Log.Debugf("Type=Push, ID=%d, UID=%s, Route=%s, Data=%+v",
+	// 		a.Session.ID(), a.Session.UID(), route, v)
+	// }
 
 	sv, err := a.serviceDiscovery.GetServer(a.frontendID)
 	if err != nil {
 		return err
 	}
 	return a.sendPush(
-		pendingMessage{typ: message.Push, route: route, payload: v},
+		pendingMessage{ctx: ctx, typ: message.Push, route: route, payload: v},
 		a.Session.UID(), sv,
 	)
 }
@@ -138,14 +138,14 @@ func (a *Remote) ResponseMID(ctx context.Context, mid uint, v interface{}, isErr
 		return constants.ErrSessionOnNotify
 	}
 
-	switch d := v.(type) {
-	case []byte:
-		logger.Log.Debugf("Type=Response, ID=%d, MID=%d, Data=%dbytes",
-			a.Session.ID(), mid, len(d))
-	default:
-		logger.Log.Infof("Type=Response, ID=%d, MID=%d, Data=%+v",
-			a.Session.ID(), mid, v)
-	}
+	// switch d := v.(type) {
+	// case []byte:
+	// 	logger.Log.Debugf("Type=Response, ID=%d, MID=%d, Data=%dbytes",
+	// 		a.Session.ID(), mid, len(d))
+	// default:
+	// 	logger.Log.Infof("Type=Response, ID=%d, MID=%d, Data=%+v",
+	// 		a.Session.ID(), mid, v)
+	// }
 
 	return a.send(pendingMessage{ctx: ctx, typ: message.Response, mid: mid, payload: v, err: err}, a.reply)
 }
@@ -206,9 +206,10 @@ func (a *Remote) sendPush(m pendingMessage, userID string, sv *cluster.Server) (
 		return err
 	}
 	push := &protos.Push{
-		Route: m.route,
-		Uid:   a.Session.UID(),
-		Data:  payload,
+		Route:         m.route,
+		Uid:           a.Session.UID(),
+		Data:          payload,
+		RelationMsgId: uint64(pcontext.GetRelationMsgIdFromContext(m.ctx, a.Session.UID())),
 	}
 	return a.rpcClient.SendPush(userID, sv, push)
 }

@@ -54,11 +54,11 @@ func (app *App) GroupBroadcast(ctx context.Context, frontendType, groupName, rou
 	if err != nil {
 		return err
 	}
-	return app.sendDataToMembers(members, frontendType, route, v)
+	return app.sendDataToMembers(ctx, members, frontendType, route, v)
 }
 
-func (app *App) sendDataToMembers(uids []string, frontendType, route string, v interface{}) error {
-	errUids, err := app.SendPushToUsers(route, v, uids, frontendType)
+func (app *App) sendDataToMembers(ctx context.Context, uids []string, frontendType, route string, v interface{}) error {
+	errUids, err := app.SendPushToUsers(ctx, route, v, uids, frontendType)
 	if err != nil {
 		logger.Log.Errorf("Group push message error, UID=%v, Error=%s", errUids, err.Error())
 		return err

@@ -145,8 +145,8 @@ func ReliableRPCWithOptions(routeStr string, metadata map[string]interface{}, re
 	return DefaultApp.ReliableRPCWithOptions(routeStr, metadata, reply, arg, opts)
 }
 
-func SendPushToUsers(route string, v interface{}, uids []string, frontendType string) ([]string, error) {
-	return DefaultApp.SendPushToUsers(route, v, uids, frontendType)
+func SendPushToUsers(ctx context.Context, route string, v interface{}, uids []string, frontendType string) ([]string, error) {
+	return DefaultApp.SendPushToUsers(ctx, route, v, uids, frontendType)
 }
 
 func SendKickToUsers(uids []string, frontendType string) ([]string, error) {

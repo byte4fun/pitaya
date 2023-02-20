@@ -318,8 +318,13 @@ func (ns *NatsRPCServer) processSessionBindings() {
 
 func (ns *NatsRPCServer) processPushes() {
 	for push := range ns.getUserPushChannel() {
-		//logger.Log.Debugf("sending push to user %s", push.GetUid())
-		_, err := ns.pitayaServer.PushToUser(context.Background(), push)
+		// logger.Log.Debugf("sending push to user %s", push.GetUid())
+		ctx := context.Background()
+		if push.RelationMsgId != 0 {
+			ctx = context.WithValue(ctx, constants.MsgRelationKey, push.RelationMsgId)
+		}
+
+		_, err := ns.pitayaServer.PushToUser(ctx, push)
 		if err != nil {
 			logger.Log.Errorf("error sending push to user: %v", err)
 		}

@@ -65,9 +65,11 @@ type (
 		sessionPool        session.SessionPool
 		appDieChan         chan bool         // app die channel
 		chDie              chan struct{}     // wait for close
+		chOrder            chan pendingWrite // order message queue
 		chSend             chan pendingWrite // push message queue
 		chStopHeartbeat    chan struct{}     // stop heartbeats
 		chStopWrite        chan struct{}     // stop writing messages
+		chStopOrder        chan struct{}     // stop ordering messages
 		closeMutex         sync.Mutex
 		conn               net.Conn            // low-level conn fd
 		decoder            codec.PacketDecoder // binary decoder
@@ -77,8 +79,11 @@ type (
 		messageEncoder     message.Encoder
 		messagesBufferSize int // size of the pending messages buffer
 		metricsReporters   []metrics.Reporter
-		serializer         serialize.Serializer // message serializer
-		state              int32                // current agent state
+		serializer         serialize.Serializer    // message serializer
+		state              int32                   // current agent state
+		curMsgID           uint                    // cur request msg id
+		pushDelay          map[uint][]pendingWrite // push message delay
+		pushDelayMID       uint                    // push message msg id
 	}
 
 	pendingMessage struct {
@@ -94,12 +99,13 @@ type (
 		ctx  context.Context
 		data []byte
 		err  error
+		msg  *message.Message
 	}
 
 	// Agent corresponds to a user and is used for storing raw Conn information
 	Agent interface {
 		GetSession() session.Session
-		Push(route string, v interface{}) error
+		Push(ctx context.Context, route string, v interface{}) error
 		ResponseMID(ctx context.Context, mid uint, v interface{}, isError ...bool) error
 		Close() error
 		RemoteAddr() net.Addr
@@ -187,8 +193,11 @@ func newAgent(
 		appDieChan:         dieChan,
 		chDie:              make(chan struct{}),
 		chSend:             make(chan pendingWrite, messagesBufferSize),
+		chOrder:            make(chan pendingWrite, messagesBufferSize*10),
 		chStopHeartbeat:    make(chan struct{}),
 		chStopWrite:        make(chan struct{}),
+		chStopOrder:        make(chan struct{}),
+		pushDelay:          make(map[uint][]pendingWrite),
 		messagesBufferSize: messagesBufferSize,
 		conn:               conn,
 		decoder:            packetDecoder,
@@ -263,9 +272,13 @@ func (a *agentImpl) send(pendingMsg pendingMessage) (err error) {
 		return err
 	}
 
+	// just for response
+	m.Route = pendingMsg.route
+
 	pWrite := pendingWrite{
 		ctx:  pendingMsg.ctx,
 		data: p,
+		msg:  m,
 	}
 
 	if pendingMsg.err {
@@ -274,7 +287,7 @@ func (a *agentImpl) send(pendingMsg pendingMessage) (err error) {
 
 	// chSend is never closed so we need this to don't block if agent is already closed
 	select {
-	case a.chSend <- pWrite:
+	case a.chOrder <- pWrite:
 	case <-a.chDie:
 	}
 	return
@@ -286,20 +299,24 @@ func (a *agentImpl) GetSession() session.Session {
 }
 
 // Push implementation for NetworkEntity interface
-func (a *agentImpl) Push(route string, v interface{}) error {
+func (a *agentImpl) Push(ctx context.Context, route string, v interface{}) error {
 	if a.GetStatus() == constants.StatusClosed {
 		return errors.NewError(constants.ErrBrokenPipe, errors.ErrClientClosedRequest)
 	}
 
-	switch d := v.(type) {
-	case []byte:
-		logger.Log.Debugf("Type=Push, ID=%d, UID=%s, Route=%s, Data=%dbytes",
-			a.Session.ID(), a.Session.UID(), route, len(d))
-	default:
-		logger.Log.Debugf("Type=Push, ID=%d, UID=%s, Route=%s, Data=%+v",
-			a.Session.ID(), a.Session.UID(), route, v)
-	}
-	return a.send(pendingMessage{typ: message.Push, route: route, payload: v})
+	// switch d := v.(type) {
+	// case []byte:
+	// 	logger.Log.Debugf("Type=Push, ID=%d, UID=%s, Route=%s, Data=%dbytes",
+	// 		a.Session.ID(), a.Session.UID(), route, len(d))
+	// default:
+	// 	logger.Log.Debugf("Type=Push, ID=%d, UID=%s, Route=%s, Data=%+v",
+	// 		a.Session.ID(), a.Session.UID(), route, v)
+	// }
+
+	midVar := pcontext.GetRelationMsgIdFromContext(ctx, a.Session.UID())
+	mid := uint(midVar)
+
+	return a.send(pendingMessage{ctx: ctx, typ: message.Push, route: route, payload: v, mid: mid})
 }
 
 // ResponseMID implementation for NetworkEntity interface
@@ -317,16 +334,16 @@ func (a *agentImpl) ResponseMID(ctx context.Context, mid uint, v interface{}, is
 		return constants.ErrSessionOnNotify
 	}
 
-	route := pcontext.GetFromPropagateCtx(ctx, constants.RouteKey)
+	// route := pcontext.GetFromPropagateCtx(ctx, constants.RouteKey)
 
-	switch d := v.(type) {
-	case []byte:
-		logger.Log.Debugf("Type=Response, ID=%d, UID=%s, MID=%d, Route=%s, Data=%dbytes",
-			a.Session.ID(), a.Session.UID(), mid, route, len(d))
-	default:
-		logger.Log.Infof("Type=Response, ID=%d, UID=%s, MID=%d, Route=%s, Data=%+v",
-			a.Session.ID(), a.Session.UID(), mid, v)
-	}
+	// switch d := v.(type) {
+	// case []byte:
+	// 	logger.Log.Debugf("Type=Response, ID=%d, UID=%s, MID=%d, Route=%s, Data=%dbytes",
+	// 		a.Session.ID(), a.Session.UID(), mid, route, len(d))
+	// default:
+	// 	logger.Log.Infof("Type=Response, ID=%d, UID=%s, MID=%d, Route=%s, Data=%+v",
+	// 		a.Session.ID(), a.Session.UID(), mid, v)
+	// }
 
 	return a.send(pendingMessage{ctx: ctx, typ: message.Response, mid: mid, payload: v, err: err})
 }
@@ -350,6 +367,7 @@ func (a *agentImpl) Close() error {
 		// expect
 	default:
 		close(a.chStopWrite)
+		close(a.chStopOrder)
 		close(a.chStopHeartbeat)
 		close(a.chDie)
 		a.onSessionClosed(a.Session)
@@ -405,6 +423,7 @@ func (a *agentImpl) Handle() {
 	}()
 
 	go a.write()
+	go a.ordered()
 	go a.heartbeat()
 	<-a.chDie // agent closed signal
 }
@@ -581,6 +600,68 @@ func (a *agentImpl) reportChannelSize() {
 	for _, mr := range a.metricsReporters {
 		if err := mr.ReportGauge(metrics.ChannelCapacity, map[string]string{"channel": "agent_chsend"}, float64(chSendCapacity)); err != nil {
 			logger.Log.Warnf("failed to report chSend channel capaacity: %s", err.Error())
+		}
+	}
+}
+
+func (a *agentImpl) ordered() {
+	// clean func
+	defer func() {
+		a.Close()
+	}()
+
+	send := func(pWrite pendingWrite) {
+		select {
+		case a.chSend <- pWrite:
+		case <-a.chDie:
+		}
+
+		msg := pWrite.msg
+		if msg.Type == message.Push {
+			logger.Log.Debugf("Type=RPush, ID=%d, UID=%s, RID=%d Route=%s, Data=%dbytes",
+				a.Session.ID(), a.Session.UID(), msg.ID, msg.Route, len(msg.Data))
+
+		} else if msg.Type == message.Response {
+			logger.Log.Debugf("Type=RResponse, ID=%d, UID=%s, MID=%d, Route=%s, Data=%dbytes",
+				a.Session.ID(), a.Session.UID(), msg.ID, msg.Route, len(msg.Data))
+		}
+	}
+	for {
+		select {
+		case pWrite := <-a.chOrder:
+			m := pWrite.msg
+
+			if m.Type == message.Push && m.ID > 0 && m.ID > a.curMsgID {
+				tID := m.ID
+				a.pushDelay[tID] = append(a.pushDelay[tID], pWrite)
+				a.pushDelayMID = tID
+				logger.Log.Debugf("freeze push msg, relation.id=%v route=%s", tID, m.Route)
+				continue
+			}
+
+			if m.Type == message.Push && a.pushDelayMID > 0 {
+				tID := a.pushDelayMID
+				a.pushDelay[tID] = append(a.pushDelay[tID], pWrite)
+				logger.Log.Debugf("freeze push msg, relation.id=%v route=%s len=%d", tID, m.Route, len(a.pushDelay[tID]))
+				continue
+			}
+
+			send(pWrite)
+
+			if m.Type == message.Response {
+				a.curMsgID = m.ID
+				if val, ok := a.pushDelay[m.ID]; ok {
+					logger.Log.Debugf("restore push msg, relation.id=%v len=%d", a.pushDelayMID, len(a.pushDelay[m.ID]))
+					for _, v := range val {
+						logger.Log.Debugf("restore push msg, relation.id=%v route=%s", m.ID, v.msg.Route)
+						send(v)
+					}
+					delete(a.pushDelay, m.ID)
+					a.pushDelayMID = 0
+				}
+			}
+		case <-a.chStopOrder:
+			return
 		}
 	}
 }

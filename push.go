@@ -21,15 +21,18 @@
 package pitaya
 
 import (
+	"context"
+
 	"github.com/topfreegames/pitaya/v2/cluster"
 	"github.com/topfreegames/pitaya/v2/constants"
+	pcontext "github.com/topfreegames/pitaya/v2/context"
 	"github.com/topfreegames/pitaya/v2/logger"
 	"github.com/topfreegames/pitaya/v2/protos"
 	"github.com/topfreegames/pitaya/v2/util"
 )
 
 // SendPushToUsers sends a message to the given list of users
-func (app *App) SendPushToUsers(route string, v interface{}, uids []string, frontendType string) ([]string, error) {
+func (app *App) SendPushToUsers(ctx context.Context, route string, v interface{}, uids []string, frontendType string) ([]string, error) {
 	data, err := util.SerializeOrRaw(app.serializer, v)
 	if err != nil {
 		return uids, err
@@ -45,16 +48,17 @@ func (app *App) SendPushToUsers(route string, v interface{}, uids []string, fron
 
 	for _, uid := range uids {
 		if s := app.sessionPool.GetSessionByUID(uid); s != nil && app.server.Type == frontendType {
-			if err := s.Push(route, data); err != nil {
+			if err := s.Push(ctx, route, data); err != nil {
 				notPushedUids = append(notPushedUids, uid)
 				logger.Log.Errorf("Session push message error, ID=%d, UID=%s, Error=%s",
 					s.ID(), s.UID(), err.Error())
 			}
 		} else if app.rpcClient != nil {
 			push := &protos.Push{
-				Route: route,
-				Uid:   uid,
-				Data:  data,
+				Route:         route,
+				Uid:           uid,
+				Data:          data,
+				RelationMsgId: uint64(pcontext.GetRelationMsgIdFromContext(ctx, uid)),
 			}
 			if err = app.rpcClient.SendPush(uid, &cluster.Server{Type: frontendType}, push); err != nil {
 				notPushedUids = append(notPushedUids, uid)

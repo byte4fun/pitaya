@@ -49,6 +49,7 @@ import (
 
 // RemoteService struct
 type RemoteService struct {
+	protos.UnimplementedPitayaServer
 	baseService
 	rpcServer              cluster.RPCServer
 	serviceDiscovery       cluster.ServiceDiscovery
@@ -172,10 +173,10 @@ func (r *RemoteService) SessionBindRemote(ctx context.Context, msg *protos.BindM
 
 // PushToUser sends a push to user
 func (r *RemoteService) PushToUser(ctx context.Context, push *protos.Push) (*protos.Response, error) {
-	//logger.Log.Debugf("sending push to user %s", push.GetUid())
+	// logger.Log.Debugf("sending push to user %s", push.GetUid())
 	s := r.sessionPool.GetSessionByUID(push.GetUid())
 	if s != nil {
-		err := s.Push(push.Route, push.Data)
+		err := s.Push(ctx, push.Route, push.Data)
 		if err != nil {
 			return nil, err
 		}
@@ -410,7 +411,7 @@ func (r *RemoteService) handleRPCSys(ctx context.Context, req *protos.Request, r
 		return response
 	}
 
-	ret, err := r.handlerPool.ProcessHandlerMessage(ctx, rt, r.serializer, r.handlerHooks, a.Session, req.GetMsg().GetData(), req.GetMsg().GetType(), true)
+	ret, err := r.handlerPool.ProcessHandlerMessage(ctx, rt, r.serializer, r.handlerHooks, a.Session, req.GetMsg().GetId(), req.GetMsg().GetData(), req.GetMsg().GetType(), true)
 	if err != nil {
 		logger.Log.Warnf(err.Error())
 		response = &protos.Response{

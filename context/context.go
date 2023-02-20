@@ -43,6 +43,25 @@ func GetFromPropagateCtx(ctx context.Context, key string) interface{} {
 	return nil
 }
 
+// GetRelationMsgIdFromContext get the relation msg id from context
+func GetRelationMsgIdFromContext(ctx context.Context, uid string) uint {
+	if ctx == nil {
+		return 0
+	}
+	relateMsgId := uint64(0)
+
+	if val := ctx.Value(constants.MsgRelationKey); val != nil {
+		switch v := val.(type) {
+		case map[string]uint64:
+			relateMsgId = v[uid]
+		case uint64:
+			relateMsgId = v
+		}
+	}
+
+	return uint(relateMsgId)
+}
+
 // ToMap returns the values that will be propagated through RPC calls in map[string]interface{} format
 func ToMap(ctx context.Context) map[string]interface{} {
 	if ctx == nil {

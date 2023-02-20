@@ -46,6 +46,7 @@ func (h *HandlerPool) ProcessHandlerMessage(
 	serializer serialize.Serializer,
 	handlerHooks *pipeline.HandlerHooks,
 	session session.Session,
+	msgId uint64,
 	data []byte,
 	msgTypeIface interface{},
 	remote bool,
@@ -55,6 +56,7 @@ func (h *HandlerPool) ProcessHandlerMessage(
 	}
 	ctx = context.WithValue(ctx, constants.SessionCtxKey, session)
 	ctx = util.CtxWithDefaultLogger(ctx, rt.String(), session.UID())
+	ctx = context.WithValue(ctx, constants.MsgIDKey, msgId)
 
 	handler, err := h.getHandler(rt)
 	if err != nil {

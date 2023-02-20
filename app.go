@@ -27,7 +27,6 @@ import (
 	"reflect"
 	"strings"
 	"syscall"
-
 	"time"
 
 	"github.com/golang/protobuf/proto"
@@ -103,7 +102,7 @@ type Pitaya interface {
 		opts *config.EnqueueOpts,
 	) (jid string, err error)
 
-	SendPushToUsers(route string, v interface{}, uids []string, frontendType string) ([]string, error)
+	SendPushToUsers(ctx context.Context, route string, v interface{}, uids []string, frontendType string) ([]string, error)
 	SendKickToUsers(uids []string, frontendType string) ([]string, error)
 
 	GroupCreate(ctx context.Context, groupName string) error

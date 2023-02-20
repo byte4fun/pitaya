@@ -536,7 +536,7 @@ func (mr *MockPitayaMockRecorder) SendKickToUsers(arg0, arg1 interface{}) *gomoc
 }
 
 // SendPushToUsers mocks base method
-func (m *MockPitaya) SendPushToUsers(arg0 string, arg1 interface{}, arg2 []string, arg3 string) ([]string, error) {
+func (m *MockPitaya) SendPushToUsers(ctx context.Context, arg0 string, arg1 interface{}, arg2 []string, arg3 string) ([]string, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "SendPushToUsers", arg0, arg1, arg2, arg3)
 	ret0, _ := ret[0].([]string)

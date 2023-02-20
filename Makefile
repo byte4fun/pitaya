@@ -54,9 +54,9 @@ protos-compile-demo:
 	@protoc -I examples/demo/protos examples/demo/protos/*.proto --go_out=.
 
 protos-compile:
-	@cd benchmark/testdata && ./gen_proto.sh
-	@protoc -I pitaya-protos/ pitaya-protos/*.proto --go_out=plugins=grpc:protos
-	@protoc -I pitaya-protos/test pitaya-protos/test/*.proto --go_out=protos/test
+	@#cd benchmark/testdata && ./gen_proto.sh
+	@protoc -I pitaya-protos/ pitaya-protos/*.proto --go_out=protos --go-grpc_out=protos
+	@#protoc -I pitaya-protos/test pitaya-protos/test/*.proto --go_out=protos/test
 
 rm-test-temp-files:
 	@rm -f cluster/127.0.0.1* 127.0.0.1*
