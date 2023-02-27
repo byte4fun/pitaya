@@ -92,12 +92,14 @@ func buildRequest(
 			Data:  msg.Data,
 		},
 	}
+	relationData := ctx.Value(constants.MsgRelationKey)
 	ctx, err := tracing.InjectSpan(ctx)
 	if err != nil {
 		logger.Log.Errorf("failed to inject span: %s", err)
 	}
 	ctx = pcontext.AddToPropagateCtx(ctx, constants.PeerIDKey, thisServer.ID)
 	ctx = pcontext.AddToPropagateCtx(ctx, constants.PeerServiceKey, thisServer.Type)
+	ctx = pcontext.AddToPropagateCtx(ctx, constants.MsgRelationKey, relationData)
 	req.Metadata, err = pcontext.Encode(ctx)
 	if err != nil {
 		return req, err

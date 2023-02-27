@@ -272,9 +272,6 @@ func (a *agentImpl) send(pendingMsg pendingMessage) (err error) {
 		return err
 	}
 
-	// just for response
-	m.Route = pendingMsg.route
-
 	pWrite := pendingWrite{
 		ctx:  pendingMsg.ctx,
 		data: p,
@@ -334,7 +331,7 @@ func (a *agentImpl) ResponseMID(ctx context.Context, mid uint, v interface{}, is
 		return constants.ErrSessionOnNotify
 	}
 
-	// route := pcontext.GetFromPropagateCtx(ctx, constants.RouteKey)
+	route := pcontext.GetFromPropagateCtx(ctx, constants.RouteKey)
 
 	// switch d := v.(type) {
 	// case []byte:
@@ -345,7 +342,7 @@ func (a *agentImpl) ResponseMID(ctx context.Context, mid uint, v interface{}, is
 	// 		a.Session.ID(), a.Session.UID(), mid, v)
 	// }
 
-	return a.send(pendingMessage{ctx: ctx, typ: message.Response, mid: mid, payload: v, err: err})
+	return a.send(pendingMessage{ctx: ctx, typ: message.Response, route: route.(string), mid: mid, payload: v, err: err})
 }
 
 // Close closes the agent, cleans inner state and closes low-level connection.

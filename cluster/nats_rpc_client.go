@@ -142,6 +142,9 @@ func (ns *NatsRPCClient) Call(
 	if err != nil {
 		logger.Log.Warnf("failed to retrieve parent span: %s", err.Error())
 	}
+
+	relationData := ctx.Value(constants.MsgRelationKey)
+
 	tags := opentracing.Tags{
 		"span.kind":       "client",
 		"local.id":        ns.server.ID,
@@ -150,6 +153,10 @@ func (ns *NatsRPCClient) Call(
 	}
 	ctx = tracing.StartSpan(ctx, "NATS RPC Call", tags, parent)
 	defer tracing.FinishSpan(ctx, err)
+
+	if relationData != nil {
+		ctx = context.WithValue(ctx, constants.MsgRelationKey, relationData)
+	}
 
 	if !ns.running {
 		err = constants.ErrRPCClientNotInitialized

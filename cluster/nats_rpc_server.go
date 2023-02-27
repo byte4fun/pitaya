@@ -321,7 +321,7 @@ func (ns *NatsRPCServer) processPushes() {
 		// logger.Log.Debugf("sending push to user %s", push.GetUid())
 		ctx := context.Background()
 		if push.RelationMsgId != 0 {
-			ctx = context.WithValue(ctx, constants.MsgRelationKey, push.RelationMsgId)
+			ctx = context.WithValue(ctx, constants.MsgRelationKey, map[string]uint64{push.Uid: push.RelationMsgId})
 		}
 
 		_, err := ns.pitayaServer.PushToUser(ctx, push)

@@ -59,9 +59,6 @@ var PropagateCtxKey = propagateKey{}
 // the propagate key
 var SpanPropagateCtxKey = "opentracing-span"
 
-// MsgIDKey is the key holding the msg id to be sent over the context
-var MsgIDKey = "msg.id"
-
 // MsgRelationKey is the key holding the msg relation info to be sent over the context
 var MsgRelationKey = "msg.relation"
 

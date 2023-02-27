@@ -34,6 +34,7 @@ import (
 	"github.com/topfreegames/pitaya/v2/conn/codec"
 	"github.com/topfreegames/pitaya/v2/conn/message"
 	"github.com/topfreegames/pitaya/v2/constants"
+	pcontext "github.com/topfreegames/pitaya/v2/context"
 	"github.com/topfreegames/pitaya/v2/docgenerator"
 	e "github.com/topfreegames/pitaya/v2/errors"
 	"github.com/topfreegames/pitaya/v2/logger"
@@ -150,6 +151,8 @@ func (r *RemoteService) Call(ctx context.Context, req *protos.Request) (*protos.
 			},
 		}
 	} else {
+		relationData := pcontext.GetRelationDataFromContext(c)
+		c = context.WithValue(c, constants.MsgRelationKey, relationData)
 		res = processRemoteMessage(c, req, r)
 	}
 
