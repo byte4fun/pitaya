@@ -53,8 +53,11 @@ type NatsRPCServer struct {
 	subChan                chan *nats.Msg // subChan is the channel used by the server to receive network messages addressed to itself
 	bindingsChan           chan *nats.Msg // bindingsChan receives notify from other servers on every user bind to session
 	unhandledReqCh         []chan *protos.Request
+	unhandledRandReqCh     chan *protos.Request
 	responses              []*protos.Response
 	requests               []*protos.Request
+	randRequests           []*protos.Request
+	randResponses          []*protos.Response
 	userPushCh             chan *protos.Push
 	userKickCh             chan *protos.KickMsg
 	sub                    *nats.Subscription
@@ -111,13 +114,16 @@ func (ns *NatsRPCServer) configure(config config.NatsRPCServerConfig) error {
 	for i := 0; i < ns.service; i++ {
 		ns.unhandledReqCh = append(ns.unhandledReqCh, make(chan *protos.Request))
 	}
+	ns.unhandledRandReqCh = make(chan *protos.Request)
 	ns.bindingsChan = make(chan *nats.Msg, ns.messagesBufferSize)
 	// the reason this channel is buffered is that we can achieve more performance by not
 	// blocking producers on a massive push
 	ns.userPushCh = make(chan *protos.Push, ns.pushBufferSize)
 	ns.userKickCh = make(chan *protos.KickMsg, ns.messagesBufferSize)
 	ns.responses = make([]*protos.Response, ns.service)
+	ns.randResponses = make([]*protos.Response, ns.service)
 	ns.requests = make([]*protos.Request, ns.service)
+	ns.randRequests = make([]*protos.Request, ns.service)
 	return nil
 }
 
@@ -200,6 +206,7 @@ func (ns *NatsRPCServer) handleMessages() {
 		for i := 0; i < ns.service; i++ {
 			close(ns.unhandledReqCh[i])
 		}
+		close(ns.unhandledRandReqCh)
 		close(ns.subChan)
 		close(ns.bindingsChan)
 	})()
@@ -239,16 +246,22 @@ func (ns *NatsRPCServer) handleMessages() {
 				threadId = int(sessionId % int64(ns.service))
 				// logger.Log.Debugf("-----> rpc route:%s id:%d threadId:%d",
 				// 	req.Msg.Route, sessionId, threadId)
+				ns.unhandledReqCh[threadId] <- req
 			} else {
-				threadId = ns.rander.Intn(ns.service)
+				// threadId = ns.rander.Intn(ns.service)
 				// logger.Log.Debugf("-----> rpc rand route:%s id:%d threadId:%d",
 				// 	req.Msg.Route, sessionId, threadId)
+				ns.unhandledRandReqCh <- req
 			}
-			ns.unhandledReqCh[threadId] <- req
 		case <-ns.stopChan:
 			return
 		}
 	}
+}
+
+// GetUnhandledRequestsChannel gets the unhandled requests channel from nats rpc server
+func (ns *NatsRPCServer) GetUnhandledRandRequestsChannel() chan *protos.Request {
+	return ns.unhandledRandReqCh
 }
 
 // GetUnhandledRequestsChannel gets the unhandled requests channel from nats rpc server
@@ -282,9 +295,32 @@ func (ns *NatsRPCServer) marshalResponse(res *protos.Response) ([]byte, error) {
 	return p, err
 }
 
+func (ns *NatsRPCServer) processRandMessages(threadID int) {
+	for ns.randRequests[threadID] = range ns.GetUnhandledRandRequestsChannel() {
+		logger.Log.Debugf("(%d) processing message %v %s", threadID, ns.randRequests[threadID].GetMsg().GetId(),
+			ns.randRequests[threadID].GetMsg().GetRoute())
+		ctx, err := util.GetContextFromRequest(ns.randRequests[threadID], ns.server.ID)
+		if err != nil {
+			ns.randResponses[threadID] = &protos.Response{
+				Error: &protos.Error{
+					Code: e.ErrInternalCode,
+					Msg:  err.Error(),
+				},
+			}
+		} else {
+			ns.randResponses[threadID], _ = ns.pitayaServer.Call(ctx, ns.randRequests[threadID])
+		}
+		p, err := ns.marshalResponse(ns.randResponses[threadID])
+		err = ns.conn.Publish(ns.randRequests[threadID].GetMsg().GetReply(), p)
+		if err != nil {
+			logger.Log.Error("error sending message response")
+		}
+	}
+}
 func (ns *NatsRPCServer) processMessages(threadID int) {
 	for ns.requests[threadID] = range ns.GetUnhandledRequestsChannel(threadID) {
-		logger.Log.Debugf("(%d) processing message %v", threadID, ns.requests[threadID].GetMsg().GetId())
+		logger.Log.Debugf("(%d) processing message %v %s", threadID, ns.requests[threadID].GetMsg().GetId(),
+			ns.requests[threadID].GetMsg().GetRoute())
 		ctx, err := util.GetContextFromRequest(ns.requests[threadID], ns.server.ID)
 		if err != nil {
 			ns.responses[threadID] = &protos.Response{
@@ -368,6 +404,7 @@ func (ns *NatsRPCServer) Init() error {
 	// this handles remote messages
 	for i := 0; i < ns.service; i++ {
 		go ns.processMessages(i)
+		go ns.processRandMessages(i)
 	}
 
 	ns.sessionPool.OnSessionBind(ns.onSessionBind)
