@@ -297,7 +297,7 @@ func (ns *NatsRPCServer) marshalResponse(res *protos.Response) ([]byte, error) {
 
 func (ns *NatsRPCServer) processRandMessages(threadID int) {
 	for ns.randRequests[threadID] = range ns.GetUnhandledRandRequestsChannel() {
-		logger.Log.Debugf("(%d) processing message %v %s", threadID, ns.randRequests[threadID].GetMsg().GetId(),
+		logger.Log.Debugf("(%d) processing rand message %v %s", threadID, ns.randRequests[threadID].GetMsg().GetId(),
 			ns.randRequests[threadID].GetMsg().GetRoute())
 		ctx, err := util.GetContextFromRequest(ns.randRequests[threadID], ns.server.ID)
 		if err != nil {
@@ -313,7 +313,7 @@ func (ns *NatsRPCServer) processRandMessages(threadID int) {
 		p, err := ns.marshalResponse(ns.randResponses[threadID])
 		err = ns.conn.Publish(ns.randRequests[threadID].GetMsg().GetReply(), p)
 		if err != nil {
-			logger.Log.Error("error sending message response")
+			logger.Log.Error("error sending rand message response")
 		}
 	}
 }
