@@ -27,6 +27,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+
 	"github.com/topfreegames/pitaya/v2/config"
 	"github.com/topfreegames/pitaya/v2/constants"
 	"github.com/topfreegames/pitaya/v2/logger"
@@ -79,14 +80,14 @@ func NewEtcdServiceDiscovery(
 		client = cli[0]
 	}
 	sd := &etcdServiceDiscovery{
-		running:         false,
-		server:          server,
-		serverMapByType: make(map[string]map[string]*Server),
-		listeners:       make([]SDListener, 0),
-		stopChan:        make(chan bool),
-		stopLeaseChan:   make(chan bool),
-		appDieChan:      appDieChan,
-		cli:             client,
+		running:            false,
+		server:             server,
+		serverMapByType:    make(map[string]map[string]*Server),
+		listeners:          make([]SDListener, 0),
+		stopChan:           make(chan bool),
+		stopLeaseChan:      make(chan bool),
+		appDieChan:         appDieChan,
+		cli:                client,
 		syncServersRunning: make(chan bool),
 	}
 
@@ -261,15 +262,18 @@ func (sd *etcdServiceDiscovery) deleteServer(serverID string) {
 	}
 }
 
-func (sd *etcdServiceDiscovery) deleteLocalInvalidServers(actualServers []string) {
+func (sd *etcdServiceDiscovery) deleteLocalInvalidServers(actualServers []string) bool {
+	deleted := false
 	sd.serverMapByID.Range(func(key interface{}, value interface{}) bool {
 		k := key.(string)
 		if !util.SliceContainsString(actualServers, k) {
 			logger.Log.Warnf("deleting invalid local server %s", k)
 			sd.deleteServer(k)
+			deleted = true
 		}
 		return true
 	})
+	return deleted
 }
 
 func getKey(serverID, serverType string) string {
@@ -296,7 +300,7 @@ func (sd *etcdServiceDiscovery) GetServersByType(serverType string) (map[string]
 		// Create a new map to avoid concurrent read and write access to the
 		// map, this also prevents accidental changes to the list of servers
 		// kept by the service discovery.
-		ret := make(map[string]*Server,len(sd.serverMapByType[serverType]))
+		ret := make(map[string]*Server, len(sd.serverMapByType[serverType]))
 		for k, v := range sd.serverMapByType[serverType] {
 			ret[k] = v
 		}
@@ -579,9 +583,12 @@ func (sd *etcdServiceDiscovery) SyncServers(firstSync bool) error {
 		sd.addServer(server)
 	}
 
-	sd.deleteLocalInvalidServers(allIds)
+	canPrint := sd.deleteLocalInvalidServers(allIds)
 
-	sd.printServers()
+	canPrint = canPrint || len(servers) > 0
+	if canPrint {
+		sd.printServers()
+	}
 	sd.lastSyncTime = time.Now()
 	elapsed := time.Since(start)
 	logger.Log.Infof("SyncServers took : %s to run", elapsed)
