@@ -149,8 +149,8 @@ func SendPushToUsers(ctx context.Context, route string, v interface{}, uids []st
 	return DefaultApp.SendPushToUsers(ctx, route, v, uids, frontendType)
 }
 
-func SendKickToUsers(uids []string, frontendType string) ([]string, error) {
-	return DefaultApp.SendKickToUsers(uids, frontendType)
+func SendKickToUsers(ctx context.Context, uids []string, frontendType string) ([]string, error) {
+	return DefaultApp.SendKickToUsers(ctx, uids, frontendType)
 }
 
 func GroupCreate(ctx context.Context, groupName string) error {

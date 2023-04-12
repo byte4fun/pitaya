@@ -370,7 +370,13 @@ func (ns *NatsRPCServer) processPushes() {
 func (ns *NatsRPCServer) processKick() {
 	for kick := range ns.getUserKickChannel() {
 		logger.Log.Debugf("Sending kick to user %s: %v", kick.GetUserId())
-		_, err := ns.pitayaServer.KickUser(context.Background(), kick)
+
+		ctx := context.Background()
+		if kick.RelationMsgId != 0 {
+			ctx = context.WithValue(ctx, constants.MsgRelationKey, map[string]uint64{kick.GetUserId(): kick.RelationMsgId})
+		}
+
+		_, err := ns.pitayaServer.KickUser(ctx, kick)
 		if err != nil {
 			logger.Log.Errorf("error sending kick to user: %v", err)
 		}

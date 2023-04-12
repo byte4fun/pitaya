@@ -393,13 +393,31 @@ func (a *agentImpl) GetStatus() int32 {
 
 // Kick sends a kick packet to a client
 func (a *agentImpl) Kick(ctx context.Context) error {
-	// packet encode
-	p, err := a.encoder.Encode(packet.Kick, nil)
-	if err != nil {
+	midVar := pcontext.GetRelationMsgIdFromContext(ctx, a.Session.UID())
+	mid := uint(midVar)
+
+	fn := func() error {
+		// packet encode
+		p, err := a.encoder.Encode(packet.Kick, nil)
+		if err != nil {
+			return err
+		}
+		_, err = a.conn.Write(p)
 		return err
 	}
-	_, err = a.conn.Write(p)
-	return err
+
+	if mid > 0 {
+		t := time.NewTicker(time.Millisecond)
+		for a.curMsgID <= mid {
+			select {
+			case <-t.C:
+			}
+		}
+		t.Stop()
+		return fn()
+	}
+
+	return fn()
 }
 
 // SetLastAt sets the last at to now

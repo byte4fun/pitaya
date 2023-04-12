@@ -103,7 +103,7 @@ type Pitaya interface {
 	) (jid string, err error)
 
 	SendPushToUsers(ctx context.Context, route string, v interface{}, uids []string, frontendType string) ([]string, error)
-	SendKickToUsers(uids []string, frontendType string) ([]string, error)
+	SendKickToUsers(ctx context.Context, uids []string, frontendType string) ([]string, error)
 
 	GroupCreate(ctx context.Context, groupName string) error
 	GroupCreateWithTTL(ctx context.Context, groupName string, ttlTime time.Duration) error

@@ -61,7 +61,7 @@ func TestSendKickToUsersLocalSession(t *testing.T) {
 	builder.SessionPool = mockSessionPool
 	app := builder.Build()
 
-	failedUids, err := app.SendKickToUsers([]string{table.uid1, table.uid2}, table.frontendType)
+	failedUids, err := app.SendKickToUsers(context.Background(), []string{table.uid1, table.uid2}, table.frontendType)
 	assert.Nil(t, failedUids)
 	assert.NoError(t, err)
 }
@@ -95,7 +95,7 @@ func TestSendKickToUsersFail(t *testing.T) {
 	builder.RPCClient = mockRPCClient
 	app := builder.Build()
 
-	failedUids, err := app.SendKickToUsers([]string{table.uid1, table.uid2}, table.frontendType)
+	failedUids, err := app.SendKickToUsers(context.Background(), []string{table.uid1, table.uid2}, table.frontendType)
 	assert.Len(t, failedUids, 1)
 	assert.Equal(t, failedUids[0], table.uid2)
 	assert.Equal(t, err, table.err)
@@ -127,7 +127,7 @@ func TestSendKickToUsersRemoteSession(t *testing.T) {
 				mockRPCClient.EXPECT().SendKick(uid, gomock.Any(), expectedKick).Return(table.err)
 			}
 
-			failedUids, err := app.SendKickToUsers(table.uids, table.frontendType)
+			failedUids, err := app.SendKickToUsers(context.Background(), table.uids, table.frontendType)
 			assert.Equal(t, err, table.err)
 			if table.err != nil {
 				assert.NotNil(t, failedUids)
