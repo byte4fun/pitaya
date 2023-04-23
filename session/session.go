@@ -23,6 +23,7 @@ package session
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net"
 	"reflect"
 	"sync"
@@ -420,7 +421,11 @@ func (s *sessionImpl) Kick(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	return s.entity.Close()
+	err = s.entity.Close()
+	if errors.Is(err, constants.ErrCloseClosedSession) {
+		err = nil
+	}
+	return err
 }
 
 // OnClose adds the function it receives to the callbacks that will be called

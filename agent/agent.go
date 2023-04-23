@@ -396,6 +396,11 @@ func (a *agentImpl) Kick(ctx context.Context) error {
 	midVar := pcontext.GetRelationMsgIdFromContext(ctx, a.Session.UID())
 	mid := uint(midVar)
 
+	if a.GetStatus() == constants.StatusClosed {
+		logger.Log.Debugf("can't send kick, session has closed, SessionID=%d, UID=%s", a.Session.ID(), a.Session.UID())
+		return nil
+	}
+
 	fn := func() error {
 		// packet encode
 		p, err := a.encoder.Encode(packet.Kick, nil)
