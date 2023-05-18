@@ -10,6 +10,7 @@ import (
 	"github.com/topfreegames/pitaya/v2/constants"
 	pcontext "github.com/topfreegames/pitaya/v2/context"
 	e "github.com/topfreegames/pitaya/v2/errors"
+	logger2 "github.com/topfreegames/pitaya/v2/logger"
 	"github.com/topfreegames/pitaya/v2/logger/interfaces"
 	"github.com/topfreegames/pitaya/v2/pipeline"
 	"github.com/topfreegames/pitaya/v2/route"
@@ -105,6 +106,25 @@ func (h *HandlerPool) ProcessHandlerMessage(
 		// the reason why we don't just Publish is to keep track of failed rpc requests
 		// with timeouts, maybe we can improve this flow
 		resp = []byte("ack")
+	}
+
+	if constants.Debug {
+		typ := ""
+		mData := map[string]interface{}{
+			"in":      arg,
+			"route":   rt.String(),
+			"userId":  session.UID(),
+			"sess.id": session.ID(),
+		}
+		switch msgType {
+		case message.Request:
+			typ = "request"
+			mData["out"] = resp
+		case message.Notify:
+			typ = "notify"
+		}
+		mData["type"] = typ
+		logger2.Log.WithFields(mData).Debug("debug")
 	}
 
 	resp, err = handlerHooks.AfterHandler.ExecuteAfterPipeline(ctx, resp, err)

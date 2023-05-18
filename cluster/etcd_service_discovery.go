@@ -590,8 +590,10 @@ func (sd *etcdServiceDiscovery) SyncServers(firstSync bool) error {
 		sd.printServers()
 	}
 	sd.lastSyncTime = time.Now()
-	elapsed := time.Since(start)
-	logger.Log.Infof("SyncServers took : %s to run", elapsed)
+	if constants.Debug {
+		elapsed := time.Since(start)
+		logger.Log.Infof("SyncServers took : %s to run", elapsed)
+	}
 	return nil
 }
 

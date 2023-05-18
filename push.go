@@ -64,6 +64,15 @@ func (app *App) SendPushToUsers(ctx context.Context, route string, v interface{}
 				notPushedUids = append(notPushedUids, uid)
 				logger.Log.Errorf("RPCClient send message error, UID=%s, SvType=%s, Error=%s", uid, frontendType, err.Error())
 			}
+
+			if constants.Debug {
+				logger.Log.WithFields(map[string]interface{}{
+					"route":  route,
+					"out":    v,
+					"type":   "push",
+					"userId": uid,
+				}).Debug("debug")
+			}
 		} else {
 			notPushedUids = append(notPushedUids, uid)
 		}

@@ -227,7 +227,9 @@ func (ns *NatsRPCServer) handleMessages() {
 			if maxPending < subsChanLen {
 				maxPending = subsChanLen
 			}
-			logger.Log.Debugf("subs channel size: %d, max: %d, dropped: %d", subsChanLen, maxPending, dropped)
+			if constants.Debug {
+				logger.Log.Debugf("subs channel size: %d, max: %d, dropped: %d", subsChanLen, maxPending, dropped)
+			}
 			req := &protos.Request{}
 			// TODO: Add tracing here to report delay to start processing message in spans
 			err = proto.Unmarshal(msg.Data, req)
@@ -297,8 +299,13 @@ func (ns *NatsRPCServer) marshalResponse(res *protos.Response) ([]byte, error) {
 
 func (ns *NatsRPCServer) processRandMessages(threadID int) {
 	for ns.randRequests[threadID] = range ns.GetUnhandledRandRequestsChannel() {
-		logger.Log.Debugf("(%d) processing rand message %v %s", threadID, ns.randRequests[threadID].GetMsg().GetId(),
-			ns.randRequests[threadID].GetMsg().GetRoute())
+		if constants.Debug {
+			logger.Log.Debugf("(%d) processing rand message %v %s",
+				threadID,
+				ns.randRequests[threadID].GetMsg().GetId(),
+				ns.randRequests[threadID].GetMsg().GetRoute(),
+			)
+		}
 		ctx, err := util.GetContextFromRequest(ns.randRequests[threadID], ns.server.ID)
 		if err != nil {
 			ns.randResponses[threadID] = &protos.Response{

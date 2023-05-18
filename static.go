@@ -29,6 +29,7 @@ import (
 	"github.com/topfreegames/pitaya/v2/cluster"
 	"github.com/topfreegames/pitaya/v2/component"
 	"github.com/topfreegames/pitaya/v2/config"
+	"github.com/topfreegames/pitaya/v2/constants"
 	"github.com/topfreegames/pitaya/v2/interfaces"
 	"github.com/topfreegames/pitaya/v2/metrics"
 	"github.com/topfreegames/pitaya/v2/router"
@@ -62,6 +63,7 @@ func GetDieChan() chan bool {
 }
 
 func SetDebug(debug bool) {
+	constants.Debug = debug
 	DefaultApp.SetDebug(debug)
 }
 
