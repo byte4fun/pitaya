@@ -26,6 +26,7 @@ import (
 	e "errors"
 	"fmt"
 	"net"
+	"sort"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -655,14 +656,16 @@ func (a *agentImpl) ordered() {
 				tID := m.ID
 				a.pushDelay[tID] = append(a.pushDelay[tID], pWrite)
 				a.pushDelayMID = tID
-				logger.Log.Debugf("freeze push msg, relation.id=%v route=%s", tID, m.Route)
+				logger.Log.Debugf("freeze push msg, ID=%d, UID=%s, relation.id=%v route=%s",
+					a.Session.ID(), a.Session.UID(), tID, m.Route)
 				continue
 			}
 
 			if m.Type == message.Push && a.pushDelayMID > 0 {
 				tID := a.pushDelayMID
 				a.pushDelay[tID] = append(a.pushDelay[tID], pWrite)
-				logger.Log.Debugf("freeze push msg, relation.id=%v route=%s len=%d", tID, m.Route, len(a.pushDelay[tID]))
+				logger.Log.Debugf("freeze push msg, ID=%d, UID=%s, relation.id=%v route=%s len=%d",
+					a.Session.ID(), a.Session.UID(), tID, m.Route, len(a.pushDelay[tID]))
 				continue
 			}
 
@@ -671,13 +674,42 @@ func (a *agentImpl) ordered() {
 			if m.Type == message.Response {
 				a.curMsgID = m.ID
 				if val, ok := a.pushDelay[m.ID]; ok {
-					logger.Log.Debugf("restore push msg, relation.id=%v len=%d", a.pushDelayMID, len(a.pushDelay[m.ID]))
+					logger.Log.Debugf("restore push msg, ID=%d, UID=%s, relation.id=%v len=%d",
+						a.Session.ID(), a.Session.UID(), a.pushDelayMID, len(a.pushDelay[m.ID]))
 					for _, v := range val {
-						logger.Log.Debugf("restore push msg, relation.id=%v route=%s", m.ID, v.msg.Route)
+						logger.Log.Debugf("restore push msg, ID=%d, UID=%s, relation.id=%v route=%s",
+							a.Session.ID(), a.Session.UID(), m.ID, v.msg.Route)
 						send(v)
 					}
 					delete(a.pushDelay, m.ID)
 					a.pushDelayMID = 0
+				}
+
+				if len(a.pushDelay) > 0 {
+					keys := make([]uint, 0, len(a.pushDelay))
+					for key := range a.pushDelay {
+						keys = append(keys, key)
+					}
+					sort.Slice(keys, func(i, j int) bool {
+						return keys[i] < keys[j]
+					})
+					for _, id := range keys {
+						if id >= a.curMsgID {
+							break
+						}
+
+						if val, ok := a.pushDelay[id]; ok {
+							logger.Log.Debugf("restore old push msg, ID=%d, UID=%s, relation.id=%v len=%d",
+								a.Session.ID(), a.Session.UID(), a.pushDelayMID, len(a.pushDelay[id]))
+							for _, v := range val {
+								logger.Log.Debugf("restore old push msg, ID=%d, UID=%s, relation.id=%v route=%s",
+									a.Session.ID(), a.Session.UID(), id, v.msg.Route)
+								send(v)
+							}
+							delete(a.pushDelay, m.ID)
+							a.pushDelayMID = 0
+						}
+					}
 				}
 			}
 		case <-a.chStopOrder:
