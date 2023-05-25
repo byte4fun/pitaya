@@ -262,6 +262,13 @@ func (a *agentImpl) send(pendingMsg pendingMessage) (err error) {
 	}()
 	a.reportChannelSize()
 
+	if chSendCapacity := a.messagesBufferSize - len(a.chSend); chSendCapacity == 0 {
+		logger.Log.Warnf("the agent is will close as its network is busy, ID=%d, UID=%s",
+			a.Session.ID(), a.Session.UID())
+		a.Close()
+		return nil
+	}
+
 	m, err := a.getMessageFromPendingMessage(pendingMsg)
 	if err != nil {
 		return err
@@ -616,7 +623,7 @@ func hbdEncode(heartbeatTimeout time.Duration, packetEncoder codec.PacketEncoder
 func (a *agentImpl) reportChannelSize() {
 	chSendCapacity := a.messagesBufferSize - len(a.chSend)
 	if chSendCapacity == 0 {
-		logger.Log.Warnf("chSend is at maximum capacity")
+		logger.Log.Warnf("chSend is at maximum capacity, ID=%d, UID=%s", a.Session.ID(), a.Session.UID())
 	}
 	for _, mr := range a.metricsReporters {
 		if err := mr.ReportGauge(metrics.ChannelCapacity, map[string]string{"channel": "agent_chsend"}, float64(chSendCapacity)); err != nil {
