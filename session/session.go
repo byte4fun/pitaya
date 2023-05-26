@@ -382,6 +382,10 @@ func (s *sessionImpl) Bind(ctx context.Context, uid string) error {
 		return constants.ErrSessionAlreadyBound
 	}
 
+	if _, ok := s.pool.sessionsByID.Load(s.ID()); !ok {
+		return constants.ErrConnectionClosed
+	}
+
 	s.uid = uid
 	for _, cb := range s.pool.sessionBindCallbacks {
 		err := cb(ctx, s)
@@ -412,6 +416,19 @@ func (s *sessionImpl) Bind(ctx context.Context, uid string) error {
 			return err
 		}
 	}
+
+	// double check
+	if _, ok := s.pool.sessionsByID.Load(s.ID()); !ok {
+		for _, sub := range s.GetSubscriptions() {
+			err := sub.Unsubscribe()
+			log := logger.Log
+			if err != nil {
+				log = log.WithError(err)
+			}
+			log.Debug("unsubscribe to user's %s message channel, because it close the network", s.UID())
+		}
+		return constants.ErrConnectionClosed
+	}
 	return nil
 }
 
@@ -434,6 +451,11 @@ func (s *sessionImpl) OnClose(c func()) error {
 	if !s.IsFrontend {
 		return constants.ErrOnCloseBackend
 	}
+
+	if _, ok := s.pool.sessionsByID.Load(s.ID()); !ok {
+		return constants.ErrConnectionClosed
+	}
+
 	s.OnCloseCallbacks = append(s.OnCloseCallbacks, c)
 	return nil
 }
