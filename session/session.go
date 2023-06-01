@@ -382,8 +382,10 @@ func (s *sessionImpl) Bind(ctx context.Context, uid string) error {
 		return constants.ErrSessionAlreadyBound
 	}
 
-	if _, ok := s.pool.sessionsByID.Load(s.ID()); !ok {
-		return constants.ErrConnectionClosed
+	if s.IsFrontend {
+		if _, ok := s.pool.sessionsByID.Load(s.ID()); !ok {
+			return constants.ErrConnectionClosed
+		}
 	}
 
 	s.uid = uid
@@ -417,17 +419,19 @@ func (s *sessionImpl) Bind(ctx context.Context, uid string) error {
 		}
 	}
 
-	// double check
-	if _, ok := s.pool.sessionsByID.Load(s.ID()); !ok {
-		for _, sub := range s.GetSubscriptions() {
-			err := sub.Unsubscribe()
-			log := logger.Log
-			if err != nil {
-				log = log.WithError(err)
+	if s.IsFrontend {
+		// double check
+		if _, ok := s.pool.sessionsByID.Load(s.ID()); !ok {
+			for _, sub := range s.GetSubscriptions() {
+				err := sub.Unsubscribe()
+				log := logger.Log
+				if err != nil {
+					log = log.WithError(err)
+				}
+				log.Debug("unsubscribe to user's %s message channel, because it close the network", s.UID())
 			}
-			log.Debug("unsubscribe to user's %s message channel, because it close the network", s.UID())
+			return constants.ErrConnectionClosed
 		}
-		return constants.ErrConnectionClosed
 	}
 	return nil
 }
