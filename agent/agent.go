@@ -713,7 +713,7 @@ func (a *agentImpl) ordered() {
 									a.Session.ID(), a.Session.UID(), id, v.msg.Route)
 								send(v)
 							}
-							delete(a.pushDelay, m.ID)
+							delete(a.pushDelay, id)
 							a.pushDelayMID = 0
 						}
 					}
