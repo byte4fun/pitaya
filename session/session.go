@@ -433,6 +433,10 @@ func (s *sessionImpl) Bind(ctx context.Context, uid string) error {
 			return constants.ErrConnectionClosed
 		}
 	}
+	logger.Log.WithFields(map[string]interface{}{
+		"session.id":  s.id,
+		"session.uid": s.uid,
+	}).Info("bind success")
 	return nil
 }
 
