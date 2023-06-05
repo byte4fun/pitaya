@@ -59,6 +59,7 @@ func (app *App) SendPushToUsers(ctx context.Context, route string, v interface{}
 				Uid:           uid,
 				Data:          data,
 				RelationMsgId: uint64(pcontext.GetRelationMsgIdFromContext(ctx, uid)),
+				SessionId:     pcontext.GetSessionIdFromContext(ctx, uid),
 			}
 			if err = app.rpcClient.SendPush(uid, &cluster.Server{Type: frontendType}, push); err != nil {
 				notPushedUids = append(notPushedUids, uid)

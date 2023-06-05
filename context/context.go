@@ -43,6 +43,23 @@ func GetFromPropagateCtx(ctx context.Context, key string) interface{} {
 	return nil
 }
 
+// GetSessionIdFromContext get session id from context
+func GetSessionIdFromContext(ctx context.Context, uid string) int64 {
+	if ctx == nil {
+		return 0
+	}
+	sessionID := int64(0)
+
+	if val := ctx.Value(constants.SessionIDKey); val != nil {
+		switch v := val.(type) {
+		case map[string]int64:
+			sessionID = v[uid]
+		}
+	}
+
+	return sessionID
+}
+
 // GetRelationMsgIdFromContext get the relation msg id from context
 func GetRelationMsgIdFromContext(ctx context.Context, uid string) uint {
 	if ctx == nil {
