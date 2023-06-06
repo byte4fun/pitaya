@@ -59,7 +59,11 @@ func (h *HandlerPool) ProcessHandlerMessage(
 	ctx = context.WithValue(ctx, constants.SessionCtxKey, session)
 	ctx = util.CtxWithDefaultLogger(ctx, rt.String(), session.UID())
 	relationData := pcontext.GetRelationDataFromContext(ctx)
-	relationData[session.UID()] = msgId
+	if session.UID() != "" {
+		relationData[session.UID()] = msgId
+	} else {
+		relationData[session.String("UID")] = msgId
+	}
 	ctx = context.WithValue(ctx, constants.MsgRelationKey, relationData)
 
 	handler, err := h.getHandler(rt)
