@@ -112,7 +112,7 @@ func (h *HandlerPool) ProcessHandlerMessage(
 		resp = []byte("ack")
 	}
 
-	if constants.Debug {
+	if constants.CanPrint || constants.LogCanPrint(rt.String()) {
 		typ := ""
 		mData := map[string]interface{}{
 			"in":      arg,

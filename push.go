@@ -65,7 +65,7 @@ func (app *App) SendPushToUsers(ctx context.Context, route string, v interface{}
 				logger.Log.Errorf("RPCClient send message error, UID=%s, SvType=%s, Error=%s", uid, frontendType, err.Error())
 			}
 
-			if constants.Debug {
+			if constants.CanPrint || constants.LogCanPrint(route) {
 				logger.Log.WithFields(map[string]interface{}{
 					"route":  route,
 					"out":    v,

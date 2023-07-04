@@ -67,6 +67,11 @@ func SetDebug(debug bool) {
 	DefaultApp.SetDebug(debug)
 }
 
+func SetLogFilter(print bool, data map[string]bool) {
+	constants.CanPrint = print
+	constants.SetLogFilter(data)
+}
+
 func SetHeartbeatTime(interval time.Duration) {
 	DefaultApp.SetHeartbeatTime(interval)
 }
