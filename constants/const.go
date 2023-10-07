@@ -62,6 +62,8 @@ var SpanPropagateCtxKey = "opentracing-span"
 // MsgRelationKey is the key holding the msg relation info to be sent over the context
 var MsgRelationKey = "msg.relation"
 
+var FrontendSessionID = "frontend.session.id"
+
 // PeerIDKey is the key holding the peer id to be sent over the context
 var PeerIDKey = "peer.id"
 

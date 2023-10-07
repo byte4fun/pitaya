@@ -45,8 +45,8 @@ func GetFromPropagateCtx(ctx context.Context, key string) interface{} {
 }
 
 // GetRelationDataFromContextByUID return the relation data from context by user uid
-func GetRelationDataFromContextByUID(ctx context.Context, uid string) relation.Relation {
-	ret := relation.Relation{}
+func GetRelationDataFromContextByUID(ctx context.Context, uid string) relation.Data {
+	ret := relation.Data{}
 	if ctx == nil {
 		return ret
 	}
@@ -72,22 +72,16 @@ func GetRelationMsgIdFromContext(ctx context.Context, uid string) uint {
 }
 
 // GetRelationDataFromContext get the relation data from context
-func GetRelationDataFromContext(ctx context.Context) map[string]relation.Relation {
-	ret := make(map[string]relation.Relation)
+func GetRelationDataFromContext(ctx context.Context) map[string]relation.Data {
+	ret := make(map[string]relation.Data)
 
 	if ctx == nil {
 		return ret
 	}
 
-	if data := GetFromPropagateCtx(ctx, constants.MsgRelationKey); data != nil {
-		for k, v := range data.(map[string]relation.Relation) {
-			ret[k] = v
-		}
-	}
-
 	if val := ctx.Value(constants.MsgRelationKey); val != nil {
 		switch v := val.(type) {
-		case map[string]relation.Relation:
+		case map[string]relation.Data:
 			for uid, r := range v {
 				ret[uid] = r
 			}

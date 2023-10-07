@@ -152,7 +152,9 @@ func (r *RemoteService) Call(ctx context.Context, req *protos.Request) (*protos.
 		}
 	} else {
 		relationData := pcontext.GetRelationDataFromContext(c)
-		c = context.WithValue(c, constants.MsgRelationKey, relationData)
+		if relationData != nil && len(relationData) > 0 {
+			c = context.WithValue(c, constants.MsgRelationKey, relationData)
+		}
 		res = processRemoteMessage(c, req, r)
 	}
 
@@ -180,7 +182,12 @@ func (r *RemoteService) PushToUser(ctx context.Context, push *protos.Push) (*pro
 	s := r.sessionPool.GetSessionByUID(push.GetUid())
 	if s != nil {
 		if push.SessionId != 0 && push.SessionId != s.ID() {
-			logger.Log.Debugf("session not found, target sess.id=%v, cur sess.id=%v", push.SessionId, s.ID())
+			logger.Log.Debugf(
+				"session not found, route=%v target sess.id=%v, cur sess.id=%v",
+				push.Route,
+				push.SessionId,
+				s.ID(),
+			)
 			return nil, constants.ErrSessionNotFound
 		}
 		err := s.Push(ctx, push.Route, push.Data)

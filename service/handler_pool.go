@@ -8,12 +8,10 @@ import (
 	"github.com/topfreegames/pitaya/v2/component"
 	"github.com/topfreegames/pitaya/v2/conn/message"
 	"github.com/topfreegames/pitaya/v2/constants"
-	pcontext "github.com/topfreegames/pitaya/v2/context"
 	e "github.com/topfreegames/pitaya/v2/errors"
 	logger2 "github.com/topfreegames/pitaya/v2/logger"
 	"github.com/topfreegames/pitaya/v2/logger/interfaces"
 	"github.com/topfreegames/pitaya/v2/pipeline"
-	"github.com/topfreegames/pitaya/v2/relation"
 	"github.com/topfreegames/pitaya/v2/route"
 	"github.com/topfreegames/pitaya/v2/serialize"
 	"github.com/topfreegames/pitaya/v2/session"
@@ -59,9 +57,7 @@ func (h *HandlerPool) ProcessHandlerMessage(
 	}
 	ctx = context.WithValue(ctx, constants.SessionCtxKey, session)
 	ctx = util.CtxWithDefaultLogger(ctx, rt.String(), session.UID())
-	relationData := pcontext.GetRelationDataFromContext(ctx)
-	relationData[session.UID()] = relation.Relation{MsgID: msgId, SessID: session.ID()}
-	ctx = context.WithValue(ctx, constants.MsgRelationKey, relationData)
+	ctx = util.CtxWithRelation(ctx, msgId, session)
 
 	handler, err := h.getHandler(rt)
 	if err != nil {

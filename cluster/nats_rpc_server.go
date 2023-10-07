@@ -369,7 +369,7 @@ func (ns *NatsRPCServer) processPushes() {
 			ctx = context.WithValue(
 				ctx,
 				constants.MsgRelationKey,
-				map[string]relation.Relation{push.Uid: {MsgID: push.RelationMsgId, SessID: push.SessionId}},
+				map[string]relation.Data{push.Uid: {MsgID: push.RelationMsgId, SessID: push.SessionId}},
 			)
 		}
 
@@ -389,7 +389,7 @@ func (ns *NatsRPCServer) processKick() {
 			ctx = context.WithValue(
 				ctx,
 				constants.MsgRelationKey,
-				map[string]relation.Relation{kick.GetUserId(): {MsgID: kick.RelationMsgId, SessID: 0}},
+				map[string]relation.Data{kick.GetUserId(): {MsgID: kick.RelationMsgId, SessID: 0}},
 			)
 		}
 
