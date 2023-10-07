@@ -29,12 +29,14 @@ import (
 
 	"github.com/golang/protobuf/proto"
 	nats "github.com/nats-io/nats.go"
+
 	"github.com/topfreegames/pitaya/v2/config"
 	"github.com/topfreegames/pitaya/v2/constants"
 	e "github.com/topfreegames/pitaya/v2/errors"
 	"github.com/topfreegames/pitaya/v2/logger"
 	"github.com/topfreegames/pitaya/v2/metrics"
 	"github.com/topfreegames/pitaya/v2/protos"
+	"github.com/topfreegames/pitaya/v2/relation"
 	"github.com/topfreegames/pitaya/v2/session"
 	"github.com/topfreegames/pitaya/v2/util"
 )
@@ -364,7 +366,11 @@ func (ns *NatsRPCServer) processPushes() {
 		// logger.Log.Debugf("sending push to user %s", push.GetUid())
 		ctx := context.Background()
 		if push.RelationMsgId != 0 {
-			ctx = context.WithValue(ctx, constants.MsgRelationKey, map[string]uint64{push.Uid: push.RelationMsgId})
+			ctx = context.WithValue(
+				ctx,
+				constants.MsgRelationKey,
+				map[string]relation.Relation{push.Uid: {MsgID: push.RelationMsgId, SessID: push.SessionId}},
+			)
 		}
 
 		_, err := ns.pitayaServer.PushToUser(ctx, push)
@@ -380,7 +386,11 @@ func (ns *NatsRPCServer) processKick() {
 
 		ctx := context.Background()
 		if kick.RelationMsgId != 0 {
-			ctx = context.WithValue(ctx, constants.MsgRelationKey, map[string]uint64{kick.GetUserId(): kick.RelationMsgId})
+			ctx = context.WithValue(
+				ctx,
+				constants.MsgRelationKey,
+				map[string]relation.Relation{kick.GetUserId(): {MsgID: kick.RelationMsgId, SessID: 0}},
+			)
 		}
 
 		_, err := ns.pitayaServer.KickUser(ctx, kick)

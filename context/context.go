@@ -25,6 +25,7 @@ import (
 	"encoding/json"
 
 	"github.com/topfreegames/pitaya/v2/constants"
+	"github.com/topfreegames/pitaya/v2/relation"
 )
 
 // AddToPropagateCtx adds a key and value that will be propagated through RPC calls
@@ -43,64 +44,52 @@ func GetFromPropagateCtx(ctx context.Context, key string) interface{} {
 	return nil
 }
 
+// GetRelationDataFromContextByUID return the relation data from context by user uid
+func GetRelationDataFromContextByUID(ctx context.Context, uid string) relation.Relation {
+	ret := relation.Relation{}
+	if ctx == nil {
+		return ret
+	}
+
+	if mapRelationData := GetRelationDataFromContext(ctx); mapRelationData != nil {
+		ret = mapRelationData[uid]
+	}
+	return ret
+}
+
 // GetSessionIdFromContext get session id from context
 func GetSessionIdFromContext(ctx context.Context, uid string) int64 {
-	if ctx == nil {
-		return 0
-	}
-	sessionID := int64(0)
+	data := GetRelationDataFromContextByUID(ctx, uid)
 
-	if val := ctx.Value(constants.SessionIDKey); val != nil {
-		switch v := val.(type) {
-		case map[string]int64:
-			sessionID = v[uid]
-		}
-	}
-
-	return sessionID
+	return data.SessID
 }
 
 // GetRelationMsgIdFromContext get the relation msg id from context
 func GetRelationMsgIdFromContext(ctx context.Context, uid string) uint {
-	if ctx == nil {
-		return 0
-	}
-	relateMsgId := uint64(0)
+	data := GetRelationDataFromContextByUID(ctx, uid)
 
-	if val := ctx.Value(constants.MsgRelationKey); val != nil {
-		switch v := val.(type) {
-		case map[string]uint64:
-			relateMsgId = v[uid]
-		}
-	}
-
-	return uint(relateMsgId)
+	return uint(data.MsgID)
 }
 
 // GetRelationDataFromContext get the relation data from context
-func GetRelationDataFromContext(ctx context.Context) map[string]uint64 {
-	ret := make(map[string]uint64)
+func GetRelationDataFromContext(ctx context.Context) map[string]relation.Relation {
+	ret := make(map[string]relation.Relation)
 
 	if ctx == nil {
 		return ret
 	}
 
 	if data := GetFromPropagateCtx(ctx, constants.MsgRelationKey); data != nil {
-		for k, v := range data.(map[string]interface{}) {
-			switch data := v.(type) {
-			case float64:
-				ret[k] = uint64(data)
-			case uint64:
-				ret[k] = data
-			}
+		for k, v := range data.(map[string]relation.Relation) {
+			ret[k] = v
 		}
 	}
 
 	if val := ctx.Value(constants.MsgRelationKey); val != nil {
 		switch v := val.(type) {
-		case map[string]uint64:
-			for uid, msgID := range v {
-				ret[uid] = msgID
+		case map[string]relation.Relation:
+			for uid, r := range v {
+				ret[uid] = r
 			}
 		}
 	}
