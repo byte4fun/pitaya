@@ -26,6 +26,7 @@ import (
 	"reflect"
 
 	"github.com/golang/protobuf/proto"
+
 	"github.com/topfreegames/pitaya/v2/cluster"
 	"github.com/topfreegames/pitaya/v2/conn/codec"
 	"github.com/topfreegames/pitaya/v2/conn/message"
@@ -82,6 +83,7 @@ func NewRemote(
 	if err != nil {
 		return nil, err
 	}
+	_ = s.Set(constants.FrontendSessionID, sess.GetId())
 	a.Session = s
 
 	return a, nil

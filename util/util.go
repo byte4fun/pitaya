@@ -29,7 +29,9 @@ import (
 	"runtime/debug"
 	"strconv"
 
+	jsoniter "github.com/json-iterator/go"
 	"github.com/nats-io/nuid"
+	opentracing "github.com/opentracing/opentracing-go"
 
 	"github.com/topfreegames/pitaya/v2/conn/message"
 	"github.com/topfreegames/pitaya/v2/constants"
@@ -38,12 +40,12 @@ import (
 	"github.com/topfreegames/pitaya/v2/logger"
 	"github.com/topfreegames/pitaya/v2/logger/interfaces"
 	"github.com/topfreegames/pitaya/v2/protos"
+	"github.com/topfreegames/pitaya/v2/relation"
 	"github.com/topfreegames/pitaya/v2/serialize"
 	"github.com/topfreegames/pitaya/v2/serialize/json"
 	"github.com/topfreegames/pitaya/v2/serialize/protobuf"
+	"github.com/topfreegames/pitaya/v2/session"
 	"github.com/topfreegames/pitaya/v2/tracing"
-
-	opentracing "github.com/opentracing/opentracing-go"
 )
 
 func getLoggerFromArgs(args []reflect.Value) interfaces.Logger {
@@ -227,5 +229,47 @@ func GetContextFromRequest(req *protos.Request, serverID string) (context.Contex
 		return nil, constants.ErrNoContextFound
 	}
 	ctx = CtxWithDefaultLogger(ctx, req.GetMsg().GetRoute(), "")
+	ctx = CtxWithDefaultRelation(ctx)
 	return ctx, nil
+}
+
+// GetFrontendSessionIDFromContext gets the frontend from the context
+func GetFrontendSessionIDFromContext(sess session.Session) (frontendSessionID int64) {
+	if sess == nil {
+		return
+	}
+	frontendSessionID = sess.ID()
+	if !sess.GetIsFrontend() {
+		frontendSessionID = sess.Int64(constants.FrontendSessionID)
+	}
+	return frontendSessionID
+}
+
+// CtxWithDefaultRelation inserts a default relation data on ctx to be used on handlers and remotes.
+func CtxWithDefaultRelation(ctx context.Context) context.Context {
+	data := map[string]relation.Data{}
+	relationData := pcontext.GetFromPropagateCtx(ctx, constants.MsgRelationKey)
+	if relationData != nil {
+		buf, _ := jsoniter.Marshal(relationData)
+		_ = jsoniter.Unmarshal(buf, &data)
+	}
+
+	ctx = pcontext.AddToPropagateCtx(ctx, constants.MsgRelationKey, data)
+	ctx = context.WithValue(ctx, constants.MsgRelationKey, data)
+
+	return ctx
+}
+
+// CtxWithRelation inserts a relation data on ctx to be used on handlers and remotes.
+func CtxWithRelation(ctx context.Context, msgId uint64, sess session.Session) context.Context {
+	ctx = CtxWithDefaultRelation(ctx)
+	frontendSessionID := GetFrontendSessionIDFromContext(sess)
+	relationData := pcontext.GetRelationDataFromContext(ctx)
+	if sess.UID() != "" {
+		relationData[sess.UID()] = relation.Data{MsgID: msgId, SessID: frontendSessionID}
+	} else {
+		relationData[sess.String("UID")] = relation.Data{MsgID: msgId, SessID: frontendSessionID}
+	}
+	ctx = context.WithValue(ctx, constants.MsgRelationKey, relationData)
+	return ctx
 }
