@@ -183,10 +183,11 @@ func (r *RemoteService) PushToUser(ctx context.Context, push *protos.Push) (*pro
 	if s != nil {
 		if push.SessionId != 0 && push.SessionId != s.ID() {
 			logger.Log.Debugf(
-				"session not found, route=%v target sess.id=%v, cur sess.id=%v",
+				"session not found, route=%v target sess.id=%v, cur sess.id=%v, userId=%v",
 				push.Route,
 				push.SessionId,
 				s.ID(),
+				push.Uid,
 			)
 			return nil, constants.ErrSessionNotFound
 		}
