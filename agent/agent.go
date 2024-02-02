@@ -32,6 +32,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	opentracing "github.com/opentracing/opentracing-go"
+
 	"github.com/topfreegames/pitaya/v2/conn/codec"
 	"github.com/topfreegames/pitaya/v2/conn/message"
 	"github.com/topfreegames/pitaya/v2/conn/packet"
@@ -46,8 +48,6 @@ import (
 	"github.com/topfreegames/pitaya/v2/tracing"
 	"github.com/topfreegames/pitaya/v2/util"
 	"github.com/topfreegames/pitaya/v2/util/compression"
-
-	opentracing "github.com/opentracing/opentracing-go"
 )
 
 var (
